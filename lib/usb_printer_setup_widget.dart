@@ -196,6 +196,13 @@ class _USBPrinterSetupWidgetState extends State<USBPrinterSetupWidget> {
                           style: const TextStyle(color: Colors.white),
                         ),
                         onPressed: () async {
+                          await printerManager.disconnect(
+                            type: PrinterType.usb,
+                          );
+                          await Future.delayed(
+                            const Duration(milliseconds: 800),
+                          );
+
                           posProvider.updateUSBPrinter(
                             printerManager: printerManager,
                             printName: currentInput.name ?? '',
@@ -207,12 +214,25 @@ class _USBPrinterSetupWidgetState extends State<USBPrinterSetupWidget> {
                             address: currentInput.deviceId ?? '',
                           );
 
-                          // لا تعمل connect هنا — لأنها بتعمل مرتين!
-                          await _printTest(currentInput);
+                          final connected = await printerManager.connect(
+                            type: PrinterType.usb,
+                            model: currentInput,
+                          );
+
+                          if (!connected) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("فشل الاتصال بالطابعة المحددة."),
+                              ),
+                            );
+                            return;
+                          }
 
                           setState(() {
                             selectedInput = currentInput;
                           });
+
+                          await _printTest(currentInput);
                         },
                       ),
                     ),

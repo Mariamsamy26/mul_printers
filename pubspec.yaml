@@ -34,7 +34,10 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-  flutter_pos_printer_platform_image_3: ^1.2.4
+  flutter_pos_printer_platform_image_3:
+    git:
+      url: https://github.com/Mariamsamy26/flutter_pos_printer_platform.git
+      ref: main
 
   esc_pos_utils_plus: ^2.0.4
   screenshot: ^3.0.0

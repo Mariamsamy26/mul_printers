@@ -6,11 +6,10 @@ import 'package:flutter_pos_printer_platform_image_3/flutter_pos_printer_platfor
 import 'package:screenshot/screenshot.dart';
 import 'package:image/image.dart' as img;
 
-// PosProvider.dart
 class PosProvider with ChangeNotifier {
   //* USB PRINTER
   bool _isUSBPrinter = false;
-  late PrinterManager _printerManagerUSB;
+  PrinterManager? _printerManagerUSB; // ✅ تم تغييره ليكون nullable
   int _vendorId = -1;
   int _productId = -1;
   String _printName = '';
@@ -18,34 +17,38 @@ class PosProvider with ChangeNotifier {
   String _fullAddress = '';
 
   bool get isUSBPrinter => _isUSBPrinter;
-  PrinterManager get printerManagerUSB => _printerManagerUSB;
+  PrinterManager? get printerManagerUSB => _printerManagerUSB;
   int get vendorId => _vendorId;
   int get productId => _productId;
   String get printName => _printName;
   String get address => _address;
   String get fullAddress => _fullAddress;
 
-void updateUSBPrinter({
-  required PrinterManager printerManager,
-  required String printName,
-  required int vendorId,
-  required int productId,
-  required String address,
-}) {
-  _printerManagerUSB = printerManager;
-  _printName = printName;
-  _vendorId = vendorId;
-  _productId = productId;
+  void updateUSBPrinter({
+    required PrinterManager printerManager,
+    required String printName,
+    required int vendorId,
+    required int productId,
+    required String address,
+  }) async {
+    if (_printerManagerUSB != null) {
+      try {
+        await _printerManagerUSB!.disconnect(type: PrinterType.usb);
+        await Future.delayed(const Duration(milliseconds: 500));
+      } catch (_) {}
+    }
 
-  _address = address; 
-  _fullAddress = _getFullAddress(address);
+    _printerManagerUSB = printerManager;
+    _printName = printName;
+    _vendorId = vendorId;
+    _productId = productId;
+    _address = address;
+    _fullAddress = _getFullAddress(address);
+    _isUSBPrinter = true;
+    notifyListeners();
 
-  _isUSBPrinter = true;
-  notifyListeners();
-
-  print("✅ Updated printer: $_printName (vendor=$_vendorId, product=$_productId, address=$_fullAddress, full=$_fullAddress)");
-}
-
+    log("✅ Updated printer: $_printName (vendor=$_vendorId, product=$_productId, FULLaddress=$_fullAddress)");
+  }
 
   Future printReceipt(
     ScreenshotController screenshotController,
@@ -57,10 +60,8 @@ void updateUSBPrinter({
     final generator = Generator(PaperSize.mm80, profile);
     bytes += generator.setGlobalCodeTable('CP1252');
 
-    var logoFromAssets = await rootBundle.load(
-      'assets/images/gosmart_logo.png',
-    );
-    var logo = logoFromAssets.buffer.asUint8List();
+    final logoFromAssets = await rootBundle.load('assets/images/gosmart_logo.png');
+    final logo = logoFromAssets.buffer.asUint8List();
 
     final capturedImage = await screenshotController.capture(
       delay: const Duration(milliseconds: 20),
@@ -72,15 +73,11 @@ void updateUSBPrinter({
       return;
     }
 
-    img.Image? decodedImage = img.decodeImage(capturedImage);
-    img.Image? decodedLogo = img.decodeImage(logo);
+    final decodedImage = img.decodeImage(capturedImage);
+    final decodedLogo = img.decodeImage(logo);
 
     if (decodedLogo != null) {
-      bytes += generator.image(
-        decodedLogo,
-        align: PosAlign.center,
-        isDoubleDensity: true,
-      );
+      bytes += generator.image(decodedLogo, align: PosAlign.center, isDoubleDensity: true);
     }
 
     bytes += generator.text(
@@ -93,93 +90,60 @@ void updateUSBPrinter({
     );
 
     if (decodedImage != null) {
-      bytes += generator.image(
-        decodedImage,
-        align: PosAlign.center,
-        isDoubleDensity: true,
-      );
+      bytes += generator.image(decodedImage, align: PosAlign.center, isDoubleDensity: true);
     }
 
     if (_isUSBPrinter) {
-      _printEscPosUSB(bytes, generator);
+      await _printEscPosUSB(bytes, generator);
     }
   }
 
-String _getFullAddress(String deviceAddress) {
-  if (deviceAddress.length < 4) return '';
+  String _getFullAddress(String deviceAddress) {
+    if (deviceAddress.length < 4) return '';
 
-  // Ensure exactly 4 digits
-  deviceAddress = deviceAddress.padLeft(4, '0');
+    deviceAddress = deviceAddress.padLeft(4, '0');
+    String first = deviceAddress.substring(0, 1);
+    String last = deviceAddress.substring(2, 4);
 
-  // First 2 chars = bus number, Last 2 chars = device number
-  String first = deviceAddress.substring(0, 1); // e.g. '07'
-  String last = deviceAddress.substring(2, 4);  // e.g. '02'
+    first = first.padLeft(3, '0');
+    last = last.padLeft(3, '0');
 
-  // Pad both to 3 digits
-  first = first.padLeft(3, '0'); // '07' → '007'
-  last = last.padLeft(3, '0');   // '02' → '002'
+    return "/dev/bus/usb/$first/$last";
+  }
 
-
-  _fullAddress = "/dev/bus/usb/$first/$last";
-  return _fullAddress;
-}
-
-void _printEscPosUSB(List<int> bytes, Generator generator) async {
-  final printerInput = UsbPrinterInput(
-    name: _printName,
-    vendorId: _vendorId.toString(),
-    productId: _productId.toString(),
-    deviceId: _fullAddress,
-  );
-
-  try {
-    await _printerManagerUSB.disconnect(type: PrinterType.usb); // ⛔ مهم
-    await Future.delayed(const Duration(milliseconds: 800)); // ⏳ بعض الطابعات تحتاج وقت
-
-    final connected = await _printerManagerUSB.connect(
-      type: PrinterType.usb,
-      model: printerInput,
-    );
-
-    if (!connected) {
-      log("❌ لم يتم الاتصال بالطابعة الجديدة.");
+  Future<void> _printEscPosUSB(List<int> bytes, Generator generator) async {
+    if (_printerManagerUSB == null) {
+      log("❌ No USB printer manager initialized.");
       return;
     }
 
-    bytes += generator.cut();
+    final printerInput = UsbPrinterInput(
+      name: _printName,
+      vendorId: _vendorId.toString(),
+      productId: _productId.toString(),
+      deviceId: _fullAddress,
+    );
 
-    await _printerManagerUSB.send(bytes: bytes, type: PrinterType.usb);
-    await _printerManagerUSB.disconnect(type: PrinterType.usb);
-  } catch (e) {
-    log('❌ USB Print Error: $e');
+    try {
+      await _printerManagerUSB!.disconnect(type: PrinterType.usb);
+      await Future.delayed(const Duration(milliseconds: 800));
+
+      final connected = await _printerManagerUSB!.connect(
+        type: PrinterType.usb,
+        model: printerInput,
+      );
+
+      if (!connected) {
+        log("❌ لم يتم الاتصال بالطابعة.");
+        return;
+      }
+
+      bytes += generator.cut();
+
+      await _printerManagerUSB!.send(bytes: bytes, type: PrinterType.usb);
+      await _printerManagerUSB!.disconnect(type: PrinterType.usb);
+    } catch (e) {
+      log('❌ USB Print Error: $e');
+    }
   }
-}
-
-
-  // /// Print USB
-  // void _printEscPosUSB(List<int> bytes, Generator generator) async {
-  //   final printerInput = UsbPrinterInput(
-  //     name: _printName,
-  //     vendorId: _vendorId.toString(),
-  //     productId: _productId.toString(),
-  //     deviceId: _getFullAddress(_fullAddress),
-      
-  //   );
-
-  //   try {
-  //     await _printerManagerUSB.connect(
-  //       type: PrinterType.usb,
-  //       model: printerInput,
-  //     );
-
-  //     bytes += generator.cut();
-
-  //     await _printerManagerUSB.send(bytes: bytes, type: PrinterType.usb);
-  //     await _printerManagerUSB.disconnect(type: PrinterType.usb);
-  //   } catch (e) {
-  //     log('❌ USB Print Error: $e');
-  //   }
-  // }
-
-
 }

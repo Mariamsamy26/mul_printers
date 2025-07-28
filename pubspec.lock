@@ -137,10 +137,11 @@ packages:
   flutter_pos_printer_platform_image_3:
     dependency: "direct main"
     description:
-      name: flutter_pos_printer_platform_image_3
-      sha256: "23836dbdd0eee27d61c4e0e0d426496f7a78ddbf53df9966476987143e2be442"
-      url: "https://pub.dev"
-    source: hosted
+      path: "."
+      ref: main
+      resolved-ref: "95c67c51eea0456f2937d650a8774cad0ac173f0"
+      url: "https://github.com/Mariamsamy26/flutter_pos_printer_platform.git"
+    source: git
     version: "1.2.4"
   flutter_screenutil:
     dependency: "direct main"

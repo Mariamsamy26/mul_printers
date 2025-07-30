@@ -9,7 +9,7 @@ import 'package:image/image.dart' as img;
 class PosProvider with ChangeNotifier {
   //* USB PRINTER
   bool _isUSBPrinter = false;
-  PrinterManager? _printerManagerUSB; // ✅ تم تغييره ليكون nullable
+  PrinterManager? _printerManagerUSB; 
   int _vendorId = -1;
   int _productId = -1;
   String _printName = '';
@@ -43,7 +43,7 @@ class PosProvider with ChangeNotifier {
     _vendorId = vendorId;
     _productId = productId;
     _address = address;
-    _fullAddress = _getFullAddress(address);
+    _fullAddress = address;
     _isUSBPrinter = true;
     notifyListeners();
 
@@ -98,7 +98,7 @@ class PosProvider with ChangeNotifier {
     }
   }
 
-  String _getFullAddress(String deviceAddress) {
+  String getFullAddress(String deviceAddress) {
     if (deviceAddress.length < 4) return '';
 
     deviceAddress = deviceAddress.padLeft(4, '0');

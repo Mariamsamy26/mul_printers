@@ -141,11 +141,16 @@ class _USBPrinterSetupWidgetState extends State<USBPrinterSetupWidget> {
                 itemCount: devices.length,
                 itemBuilder: (context, index) {
                   final device = devices[index];
+
+                  final fullAddress = posProvider.getFullAddress(
+                    device.address!,
+                  );
+
                   final currentInput = UsbPrinterInput(
                     name: device.name,
                     vendorId: device.vendorId,
                     productId: device.productId,
-                    deviceId: device.address,
+                    deviceId: fullAddress, 
                   );
 
                   final isSelected =
@@ -211,8 +216,10 @@ class _USBPrinterSetupWidgetState extends State<USBPrinterSetupWidget> {
                             productId:
                                 int.tryParse(currentInput.productId ?? '') ??
                                 -1,
-                            address: currentInput.deviceId ?? '',
+                            address: fullAddress,
+                            // address: currentInput.deviceId ?? '',
                           );
+                          print("KKKKKKKKKKK ${fullAddress}");
 
                           final connected = await printerManager.connect(
                             type: PrinterType.usb,
